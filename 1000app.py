@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 
-# 1. 페이지 설정 및 브라우저 자동 번역 차단
+# 1. 페이지 설정 및 브라우저 자동 번역 오작동 차단
 st.set_page_config(page_title="대입 전형 및 권역별 권장과목 분석 시스템", layout="wide")
 st.markdown(
     """
@@ -23,7 +23,7 @@ MAJOR_MAPPING = {
     "간호/보건계열": ["간호", "물리치료", "방사선", "안경", "언어치료", "응급구조", "임상병리", "작업치료", "치기공", "치위생"],
     "문과(인문/어문/사학)": ["국문", "국어국문", "중문", "중어중문", "영문", "영어영문", "불문", "불어불문", "독문", "독어독문", "노문", "노어노문", "서문", "스페인", "역사", "사학", "철학", "미학", "고고", "미술사", "문화인류", "문헌정보", "통번역", "국제"],
     "사범(교육계열)": ["교육학", "국어교육", "영어교육", "불어교육", "독어교육", "사회교육", "역사교육", "지리교육", "윤리교육", "수학교육", "물리교육", "화학교육", "생물교육", "지구과학교육", "체육교육", "음악교육", "미술교육"],
-    "이과(순수과학)": ["수학", "화학", "천문", "우주", "인공위성", "물리", "지구시스템", "대기"],
+    "이과(순수과학)": ["수학과", "화학과", "천문", "우주", "인공위성", "물리학과", "지구시스템", "대기"],
     "공과(신소재/건설/제조)": ["반도체", "신소재", "재료", "건설환경", "토목", "건축", "화공", "화학공학", "화공생명", "전기", "전자", "도시공학", "기계", "산업공학", "디스플레이", "조선", "해양공학", "원자력", "에너지", "항공우주"],
     "컴퓨터/AI/소프트웨어": ["컴퓨터", "인공지능", "AI", "IT융합", "영상예술", "소프트웨어", "정보보안", "보안"],
     "자연(바이오/생명/농림)": ["생물학", "생화학", "생명공학", "생명과학", "통계", "유전", "원예", "식물생산", "산림", "응용생물", "동물공학", "바이오시스템", "조경"],
@@ -49,39 +49,38 @@ def load_admission_data():
 def load_curriculum_data():
     file_path = os.path.join(BASE_DIR, EXCEL_FILE_NAME)
     if not os.path.exists(file_path): return pd.DataFrame()
-    try: df_raw = pd.read_excel(file_path, sheet_name=0, header=None, engine='openpyxl')
-    except Exception: return pd.DataFrame()
-    
-    df_data = df_raw.iloc[4:].copy()
-    df_cleaned = pd.DataFrame()
-    df_cleaned['권역'] = df_data.iloc[:, 0] if df_data.shape[1] > 0 else ""
-    df_cleaned['지역'] = df_data.iloc[:, 1] if df_data.shape[1] > 1 else ""
-    df_cleaned['대학명'] = df_data.iloc[:, 2] if df_data.shape[1] > 2 else ""
-    df_cleaned['모집단위'] = df_data.iloc[:, 3] if df_data.shape[1] > 3 else ""
-    df_cleaned['핵심과목'] = df_data.iloc[:, 5] if df_data.shape[1] > 5 else ""
-    df_cleaned['권장과목'] = df_data.iloc[:, 6] if df_data.shape[1] > 6 else ""
-    df_cleaned['비고'] = df_data.iloc[:, 7] if df_data.shape[1] > 7 else ""
-    
-    for col in df_cleaned.columns:
-        df_cleaned[col] = df_cleaned[col].fillna("").astype(str).str.replace(r'\s+', ' ', regex=True).str.strip()
+    try:
+        df_raw = pd.read_excel(file_path, sheet_name=0, header=None, engine='openpyxl')
+        if df_raw.empty: return pd.DataFrame()
+        df_data = df_raw.iloc[4:].copy()
+        ncol = df_data.shape[1]
         
-    df_cleaned['권역'] = df_cleaned['권역'].replace('', np.nan).ffill()
-    df_cleaned['지역'] = df_cleaned['지역'].replace('', np.nan).ffill()
-    df_cleaned['대학명'] = df_cleaned['대학명'].replace('', np.nan).ffill()
-    df_cleaned = df_cleaned[df_cleaned['모집단위'] != ""]
-    return df_cleaned
+        df_cleaned = pd.DataFrame()
+        mapping_indices = {'권역': 0, '지역': 1, '대학명': 2, '모집단위': 3, '핵심과목': 5, '권장과목': 6, '비고': 7}
+        for k, idx in mapping_indices.items():
+            if ncol > idx: df_cleaned[k] = df_data.iloc[:, idx]
+            else: df_cleaned[k] = ""
+                
+        for col in df_cleaned.columns:
+            df_cleaned[col] = df_cleaned[col].fillna("").astype(str).str.replace(r'\s+', ' ', regex=True).str.strip()
+            
+        df_cleaned['권역'] = df_cleaned['권역'].replace('', np.nan).ffill()
+        df_cleaned['지역'] = df_cleaned['지역'].replace('', np.nan).ffill()
+        df_cleaned['대학명'] = df_cleaned['대학명'].replace('', np.nan).ffill()
+        df_cleaned = df_cleaned[df_cleaned['모집단위'] != ""]
+        return df_cleaned
+    except Exception:
+        return pd.DataFrame()
 
 df_cut = load_admission_data()
 df_curr = load_curriculum_data()
 
 st.title("🎯 대입 분석 및 진로교과 매핑 시스템")
-st.caption("천명의선택 프리미엄 입시 컨설팅 연동 솔루션")
+st.caption("천명의선택 프리미엄 입시 컨설팅 고도화 연동 솔루션")
 st.markdown("---")
 
 if df_cut.empty or df_curr.empty:
     st.error("❌ 입시 데이터 파일을 찾을 수 없습니다.")
-    st.markdown(f"**현재 경로:** `{BASE_DIR}`")
-    st.info(f"1. {CUT_FILE_NAME}\n2. {EXCEL_FILE_NAME}\n위 두 파일이 폴더에 있는지 확인해주세요.")
     st.stop()
 
 st.markdown("### 📋 다음 중 선택하세요")
@@ -107,7 +106,7 @@ if menu == "희망대학 컷":
         keywords = MAJOR_MAPPING[selected_major]
         pattern = "|".join(keywords)
         df_filtered = df_cut[df_cut['지역'].isin(selected_regions) & df_cut['학과명'].str.contains(pattern, na=False)].copy()
-        valid_df = df_filtered.dropna(subset=['cut_70']).sort_values(by='cut_70')
+        valid_df = df_filtered.dropna(subset=['cut_70']).sort_values(by='cut_70').copy()
         
         if valid_df.empty:
             st.error("💡 현재, 지원 가능 대학의 자료가 부족합니다.")
@@ -123,25 +122,31 @@ if menu == "희망대학 컷":
                 st.metric("📉 계열 내 최저 입결 대학 (70%컷)", f"{lowest_row['대학명']} ({lowest_row['학과명']})", f"{lowest_row['cut_70']} 등급")
             st.markdown("---")
             
-            stable_match = valid_df[valid_df['cut_70'] >= (user_gpa + 0.5)]
-            ambitious_match = valid_df[(valid_df['cut_70'] >= (user_gpa - 0.4)) & (valid_df['cut_70'] < (user_gpa + 0.5))]
-            challenge_match = valid_df[(valid_df['cut_70'] >= (user_gpa - 1.0)) & (valid_df['cut_70'] < (user_gpa - 0.4))]
+            stable_match = valid_df[valid_df['cut_70'] >= (user_gpa + 0.5)].copy()
+            ambitious_match = valid_df[(valid_df['cut_70'] >= (user_gpa - 0.4)) & (valid_df['cut_70'] < (user_gpa + 0.5))].copy()
+            challenge_match = valid_df[(valid_df['cut_70'] >= (user_gpa - 1.0)) & (valid_df['cut_70'] < (user_gpa - 0.4))].copy()
             
-            if stable_match.empty: stable_match = valid_df[valid_df['cut_70'] > user_gpa].tail(1)
+            if stable_match.empty: stable_match = valid_df[valid_df['cut_70'] > user_gpa].tail(1).copy()
             if ambitious_match.empty:
                 valid_df['diff'] = (valid_df['cut_70'] - user_gpa).abs()
-                ambitious_match = valid_df.sort_values(by='diff').head(1).drop(columns=['diff'])
-            if challenge_match.empty: challenge_match = valid_df[valid_df['cut_70'] < user_gpa].head(1)
+                ambitious_match = valid_df.sort_values(by='diff').head(1).copy()
+                if 'diff' in ambitious_match.columns: ambitious_match = ambitious_match.drop(columns=['diff'])
+            if challenge_match.empty: challenge_match = valid_df[valid_df['cut_70'] < user_gpa].head(1).copy()
                 
             display_cols = ['지역', '대학명', '전형명', '학과명', '2025등급컷2', '2025등급컷']
-            rename_cols = {'지역':'지역', '대학명':'대학명', '전형명':'전형 종류', '학과명':'학과명', '2025등급컷2':'50% 합격컷', '2025등급컷':'70% 합격컷'}
+            rename_cols = {'지역':'지역', '대학명':'대학명', '전형명':'전형 종류 (교과/지역/농어촌 등)', '학과명':'학과명', '2025등급컷2':'50% 합격컷', '2025등급컷':'70% 합격컷'}
             
-            st.subheader("🟢 안정 지원 선")
-            st.dataframe(stable_match[display_cols].rename(columns=rename_cols).reset_index(drop=True), use_container_width=True)
-            st.subheader("🟡 소신 지원 선")
-            st.dataframe(ambitious_match[display_cols].rename(columns=rename_cols).reset_index(drop=True), use_container_width=True)
-            st.subheader("🔴 도전 지원 선")
-            st.dataframe(challenge_match[display_cols].rename(columns=rename_cols).reset_index(drop=True), use_container_width=True)
+            st.subheader("🟢 안정 지원 선 (합격 안착 확률 최상)")
+            if not stable_match.empty: st.dataframe(stable_match[display_cols].rename(columns=rename_cols).reset_index(drop=True), use_container_width=True)
+            else: st.write("현재, 지원 가능 대학의 자료가 부족합니다.")
+                
+            st.subheader("🟡 소신 지원 선 (적정 적합 분석권)")
+            if not ambitious_match.empty: st.dataframe(ambitious_match[display_cols].rename(columns=rename_cols).reset_index(drop=True), use_container_width=True)
+            else: st.write("현재, 지원 가능 대학의 자료가 부족합니다.")
+                
+            st.subheader("🔴 도전 지원 선 (상향 예측 추적권)")
+            if not challenge_match.empty: st.dataframe(challenge_match[display_cols].rename(columns=rename_cols).reset_index(drop=True), use_container_width=True)
+            else: st.write("현재, 지원 가능 대학의 자료가 부족합니다.")
 
 elif menu == "진로 교과 추천":
     st.header("📚 모집단위별 고교 핵심 / 권장선택과목 매핑")
@@ -180,3 +185,27 @@ elif menu == "진로 교과 추천":
             "고교 선택 교과목 가이드라인": [core_subject, recommended_subject, note_value]
         })
         st.table(output_df)
+
+# ====================================================================
+# 🔒 [하단 고정 레이어] 대표님 요청 정정 연락처 정보 연동 및 저작권 표기
+# ====================================================================
+st.markdown("---")
+st.markdown(
+    """
+    <div style="text-align: center; color: #666666; font-size: 13px; line-height: 1.8; font-family: sans-serif;">
+        <p style="margin: 5px 0;">
+            <b>📞 상담 및 문의</b> | 
+            김태영 대표: <a href="tel:010-3715-0994" style="color: #666666; text-decoration: none;">010-3715-0994</a> &nbsp;&nbsp; 
+            채훈 소장: <a href="tel:010-3163-4029" style="color: #666666; text-decoration: none;">010-3163-4029</a>
+        </p>
+        <p style="margin: 5px 0;">
+            <b>🌐 공식 홈페이지</b> | 
+            <a href="https://choice1000.com" target="_blank" style="color: #1f77b4; font-weight: bold; text-decoration: none;">choice1000.com</a>
+        </p>
+        <p style="font-size: 11px; color: #999999; margin-top: 15px; letter-spacing: 0.5px;">
+            Copyright 2026. 천명 All rights reserved.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
