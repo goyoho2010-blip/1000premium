@@ -5,6 +5,12 @@ import os
 
 # 1. 페이지 설정 및 브라우저 자동 번역 오작동 차단
 st.set_page_config(page_title="대입 전형 및 권역별 권장과목 분석 시스템", layout="wide")
+# 상단 메뉴바(깃허브 아이콘 등) 완벽 숨김 처리
+st.markdown("""
+    <style>
+    header {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
 st.markdown(
     """
     <html lang="ko" class="notranslate" google="notranslate">
