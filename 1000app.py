@@ -53,19 +53,15 @@ def load_admission_data():
     df['cut_70'] = pd.to_numeric(df['2025등급컷'], errors='coerce')
     df['cut_50'] = pd.to_numeric(df['2025등급컷2'], errors='coerce')
     
-    # [핵심] 9등급 -> 5등급 누적 백분위 기반 정밀 환산 알고리즘
+    # 9등급 -> 5등급 누적 백분위 기반 정밀 환산 알고리즘
     def convert_9_to_5(grade9):
         if pd.isna(grade9): return np.nan
-        # 9등급제 기준점 (등급 -> 백분위)
         g9_p = [1.0, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.0]
         pct_p = [0, 4, 11, 23, 40, 60, 77, 89, 96, 100]
-        # 5등급제 기준점 (백분위 -> 등급)
         g5_p = [1.0, 1.5, 2.5, 3.5, 4.5, 5.0]
         pct5_p = [0, 10, 34, 66, 90, 100]
         
-        # 1. 9등급 점수를 백분위로 변환
         pct = np.interp(grade9, g9_p, pct_p)
-        # 2. 백분위를 다시 5등급 점수로 변환
         g5 = np.interp(pct, pct5_p, g5_p)
         return round(g5, 2)
         
@@ -120,7 +116,6 @@ st.markdown("---")
 if menu == "희망대학 컷":
     st.header("🔍 안정 · 소신 · 도전 희망대학 컷 분석")
     
-    # [추가됨] 9등급 / 5등급 선택 UI
     grade_system = st.radio(
         "📊 평가 체제 선택", 
         ("현 고3, N수생 (9등급제 기준)", "현 고1, 고2 (5등급제 환산 기준)"), 
@@ -130,7 +125,7 @@ if menu == "희망대학 컷":
     
     if is_5g:
         st.info("💡 **[입결 데이터 안내]** 본 5등급제 환산 입결은 단순 추정이 아닌, 기존 9등급제 데이터를 누적 백분위 과학적 보간법(Interpolation)으로 산출한 **분석에 의한 예측 자료**입니다.")
-    st.write("") # 간격 띄우기
+    st.write("") 
 
     col1, col2 = st.columns(2)
     with col1:
@@ -154,9 +149,7 @@ if menu == "희망대학 컷":
         pattern = "|".join(keywords)
         df_filtered = df_cut[df_cut['지역'].isin(selected_regions) & df_cut['학과명'].str.contains(pattern, na=False)].copy()
         
-        # 선택된 등급제에 따라 기준 컬럼 변경
         target_col = 'cut_70_5g' if is_5g else 'cut_70'
-        
         valid_df = df_filtered.dropna(subset=[target_col]).sort_values(by=target_col).copy()
         
         if valid_df.empty:
@@ -175,7 +168,6 @@ if menu == "희망대학 컷":
                 st.metric("📉 계열 내 최저 입결 대학 (70%컷)", f"{lowest_row['대학명']} ({lowest_row['학과명']})", f"{lowest_row[target_col]:.2f} {unit}")
             st.markdown("---")
             
-            # 5등급제는 등급 촘촘함이 다르므로 margin(오차범위)을 다르게 적용
             if is_5g:
                 s_margin, a_up, a_down, c_up, c_down = 0.25, 0.25, 0.15, 0.15, 0.6
             else:
@@ -192,7 +184,6 @@ if menu == "희망대학 컷":
                 if 'diff' in ambitious_match.columns: ambitious_match = ambitious_match.drop(columns=['diff'])
             if challenge_match.empty: challenge_match = valid_df[valid_df[target_col] < user_gpa].head(1).copy()
                 
-            # 출력 컬럼명 동적 변경
             if is_5g:
                 display_cols = ['지역', '대학명', '전형명', '학과명', 'cut_50_5g', 'cut_70_5g']
                 rename_cols = {'지역':'지역', '대학명':'대학명', '전형명':'전형 종류 (농어촌 등)', '학과명':'학과명', 'cut_50_5g':'50% 합격컷(5등급)', 'cut_70_5g':'70% 합격컷(5등급)'}
@@ -255,3 +246,31 @@ elif menu == "진로 교과 추천":
             "고교 선택 교과목 가이드라인": [core_subject, recommended_subject, note_value]
         })
         st.table(output_df)
+
+# ==========================================
+# 🌟 [요청 반영] 시스템 하단 푸터(Footer) 영역 연동 🌟
+# ==========================================
+st.markdown("<br><br><hr>", unsafe_allow_html=True)
+foot_col1, foot_col2 = st.columns([2, 1])
+
+with foot_col1:
+    st.markdown(
+        """
+        <div style='line-height: 1.8; color: #555555; font-size: 0.95rem;'>
+            <b>대표</b> 김태영 010-3715-0994 &nbsp;&nbsp;|&nbsp;&nbsp; 
+            <b>소장</b> 채훈 010-3164-4029 &nbsp;&nbsp;|&nbsp;&nbsp; 
+            <a href='http://choice1000.com' target='_blank' style='text-decoration: none; color: #1f77b4; font-weight: bold;'>choice1000.com</a>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
+
+with foot_col2:
+    st.markdown(
+        """
+        <div style='text-align: right; color: #888888; font-size: 0.85rem; padding-top: 5px;'>
+            ⓒ 2026. 천명의선택 All Rights Reserved.
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
