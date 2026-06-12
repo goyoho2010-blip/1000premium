@@ -247,30 +247,24 @@ elif menu == "진로 교과 추천":
         })
         st.table(output_df)
 
-# ==========================================
-# 🌟 [요청 반영] 시스템 하단 푸터(Footer) 영역 연동 🌟
-# ==========================================
+# ========================================================
+# 🌟 [최종 보완] 모바일 전화 연동 및 반응형 센터 정렬 푸터 🌟
+# ========================================================
 st.markdown("<br><br><hr>", unsafe_allow_html=True)
-foot_col1, foot_col2 = st.columns([2, 1])
 
-with foot_col1:
-    st.markdown(
-        """
-        <div style='line-height: 1.8; color: #555555; font-size: 0.95rem;'>
-            <b>대표</b> 김태영 010-3715-0994 &nbsp;&nbsp;|&nbsp;&nbsp; 
-            <b>소장</b> 채훈 010-3164-4029 &nbsp;&nbsp;|&nbsp;&nbsp; 
+# 스마트폰 화면에서도 줄바꿈이 깔끔하고 정렬이 흩어지지 않게 CSS로 중앙 정렬 처리
+st.markdown(
+    """
+    <div style='text-align: center; line-height: 2.0; color: #444444; font-size: 0.95rem; font-family: sans-serif;'>
+        <div style='margin-bottom: 8px;'>
+            대표 <a href='tel:010-3715-0994' style='text-decoration: none; color: #111111; font-weight: bold;'>김태영 010-3715-0994</a> &nbsp;&nbsp;·&nbsp;&nbsp; 
+            소장 <a href='tel:010-3164-4029' style='text-decoration: none; color: #111111; font-weight: bold;'>채훈 010-3164-4029</a> &nbsp;&nbsp;·&nbsp;&nbsp; 
             <a href='http://choice1000.com' target='_blank' style='text-decoration: none; color: #1f77b4; font-weight: bold;'>choice1000.com</a>
         </div>
-        """, 
-        unsafe_allow_html=True
-    )
-
-with foot_col2:
-    st.markdown(
-        """
-        <div style='text-align: right; color: #888888; font-size: 0.85rem; padding-top: 5px;'>
+        <div style='color: #888888; font-size: 0.85rem;'>
             ⓒ 2026. 천명의선택 All Rights Reserved.
         </div>
-        """, 
-        unsafe_allow_html=True
-    )
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
