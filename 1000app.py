@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import os
 
-# 1. 페이지 설정 및 브라우저 자동 번역 오작동 차단 (웹 페이지 탭 및 카카오톡 공유 제목 일관성 통일)
-st.set_page_config(page_title="천명의선택 Choice1000 대입 분석 시스템", layout="wide")
+# 1. 페이지 설정 및 브라우저 자동 번역 오작동 차단 (카톡 공유 및 브라우저 탭 제목 통일)
+st.set_page_config(page_title="천명의선택 입시 NAVI", layout="wide")
 st.markdown(
     """
     <html lang="ko" class="notranslate" google="notranslate">
@@ -18,10 +18,18 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() 
 CUT_FILE_NAME = "2026 수시정리.csv"
 EXCEL_FILE_NAME = "2028학년도 권역별 대학별 권장과목(반영과목).xlsx"
 
-# 깃허브 메뉴 등 상단 바 숨기기
+# 깃허브 메뉴 등 상단 바 숨기기 및 타이틀 한 줄 강제 정렬 스타일 적용
 st.markdown("""
     <style>
     header {visibility: hidden;}
+    /* PC 및 모바일 화면에서 제목이 절대 줄바꿈되지 않고 한 줄로 나오도록 글자 크기 최적화 */
+    .brand-title {
+        font-size: calc(1.6rem + 1.2vw) !important;
+        font-weight: 800 !important;
+        white-space: nowrap !important;
+        word-break: keep-all !important;
+        margin-bottom: 5px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -103,8 +111,8 @@ def load_curriculum_data():
 df_cut = load_admission_data()
 df_curr = load_curriculum_data()
 
-# 💡 상단 브랜드 타이틀 및 서브타이틀 직관적 통일
-st.title("🎯 천명의선택 Choice1000 대입 분석 시스템")
+# 💡 PC와 휴대폰에서 한 줄 정렬을 유지하는 고유 HTML 태그 결합 출력
+st.markdown('<div class="brand-title">🎯 천명의선택 입시 NAVI</div>', unsafe_allow_html=True)
 st.caption("천명의선택 프리미엄 입시 컨설팅 고도화 연동 솔루션")
 st.markdown("---")
 
