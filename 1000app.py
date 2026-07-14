@@ -1,18 +1,23 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import os
 
-# 1. 페이지 설정 및 브라우저 자동 번역 오작동 차단 (카톡 공유 및 브라우저 탭 제목 통일)
+# 1. 페이지 설정 및 브라우저 자동 번역 오작동 차단
 st.set_page_config(page_title="천명의선택 입시 NAVI", layout="wide")
-st.markdown(
-    """
+
+# 2. 💡 [핵심 추가] 카카오톡 미리보기 고정을 위한 Open Graph 메타 태그 강제 주입
+meta_tags = """
+<head>
+    <meta property="og:title" content="천명의선택 입시 NAVI" />
+    <meta property="og:description" content="천명의선택 프리미엄 입시 컨설팅 고도화 연동 솔루션" />
+    <meta property="og:type" content="website" />
     <html lang="ko" class="notranslate" google="notranslate">
-    <head><meta name="google" content="notranslate" /></head>
-    </html>
-    """, 
-    unsafe_allow_html=True
-)
+    <meta name="google" content="notranslate" />
+</head>
+"""
+components.html(meta_tags, height=0)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
 CUT_FILE_NAME = "2026 수시정리.csv"
