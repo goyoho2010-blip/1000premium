@@ -18,7 +18,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() 
 CUT_FILE_NAME = "2026 수시정리.csv"
 EXCEL_FILE_NAME = "2028학년도 권역별 대학별 권장과목(반영과목).xlsx"
 
-# 깃허브 메뉴 등 상단 바 숨기기 (깔끔한 UI)
+# 깃허브 메뉴 등 상단 바 숨기기
 st.markdown("""
     <style>
     header {visibility: hidden;}
@@ -39,7 +39,7 @@ MAJOR_MAPPING = {
     "예체능": []
 }
 
-@st.cache_data
+@st.cache_data(ttl=3600) # 1시간마다 캐시 갱신 (데이터 수정 시 자동 반영률 향상)
 def load_admission_data():
     file_path = os.path.join(BASE_DIR, CUT_FILE_NAME)
     if not os.path.exists(file_path): return pd.DataFrame()
@@ -68,17 +68,13 @@ def load_admission_data():
     df['cut_70_5g'] = df['cut_70'].apply(convert_9_to_5)
     df['cut_50_5g'] = df['cut_50'].apply(convert_9_to_5)
     
-    # 신규 2026 데이터가 존재할 시 5등급 변환 병행 처리
-    if '2026등급컷I' in df.columns:
-        df['cut_26_1_5g'] = pd.to_numeric(df['2026등급컷I'], errors='coerce').apply(convert_9_to_5)
-    if '2026등급컷II' in df.columns:
-        df['cut_26_2_5g'] = pd.to_numeric(df['2026등급컷II'], errors='coerce').apply(convert_9_to_5)
-    if '2026등급컷III' in df.columns:
-        df['cut_26_3_5g'] = pd.to_numeric(df['2026등급컷III'], errors='coerce').apply(convert_9_to_5)
+    if '2026등급컷I' in df.columns: df['cut_26_1_5g'] = pd.to_numeric(df['2026등급컷I'], errors='coerce').apply(convert_9_to_5)
+    if '2026등급컷II' in df.columns: df['cut_26_2_5g'] = pd.to_numeric(df['2026등급컷II'], errors='coerce').apply(convert_9_to_5)
+    if '2026등급컷III' in df.columns: df['cut_26_3_5g'] = pd.to_numeric(df['2026등급컷III'], errors='coerce').apply(convert_9_to_5)
         
     return df
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_curriculum_data():
     file_path = os.path.join(BASE_DIR, EXCEL_FILE_NAME)
     if not os.path.exists(file_path): return pd.DataFrame()
@@ -120,14 +116,11 @@ st.markdown("### 📋 다음 중 선택하세요")
 menu = st.radio("원하시는 메뉴를 선택하세요.", ("희망대학 컷", "진로 교과 추천"), horizontal=True, label_visibility="collapsed")
 st.markdown("---")
 
-# 💡 핵심 요구사항 4: 2글자 이상 일치하는지 확인하는 판별 함수
 def check_overlap(target, text):
     if pd.isna(text): return False
     text = str(text)
-    # 목표 전형명에서 2글자씩 연속된 단어를 추출해 실제 데이터에 존재하는지 스캔
     for i in range(len(target) - 1):
-        if target[i:i+2] in text:
-            return True
+        if target[i:i+2] in text: return True
     return False
 
 if menu == "희망대학 컷":
@@ -144,7 +137,6 @@ if menu == "희망대학 컷":
         st.info("💡 **[입결 데이터 안내]** 본 5등급제 환산 입결은 단순 추정이 아닌, 기존 9등급제 데이터를 누적 백분위 과학적 보간법(Interpolation)으로 산출한 **분석에 의한 예측 자료**입니다.")
     st.write("") 
 
-    # 💡 핵심 요구사항 2: 신규 전형 선택 단추 생성
     admission_types = [
         "모든전형", "교과전형", "종합전형", "논술전형", "기회전형", "농어촌전형", 
         "지역균형전형", "특성화고교전형", "실기우수자", "계약학과전형", 
@@ -163,8 +155,10 @@ if menu == "희망대학 컷":
         selected_major = st.selectbox("분석 대상 계열을 선택하세요:", list(MAJOR_MAPPING.keys()))
         
     with col2:
-        all_regions = sorted([r for r in df_cut['지역'].dropna().unique() if r != ""])
-        selected_regions = st.multiselect("대상 지역을 선택하세요:", options=all_regions, default=all_regions[:1])
+        # 💡 [필터링 업데이트] 'ㅊ'과 같은 1글자 오타 및 공백 데이터 원천 차단
+        all_regions = sorted([str(r).strip() for r in df_cut['지역'].dropna().unique() if str(r).strip() != "" and len(str(r).strip()) > 1])
+        default_val = all_regions[:1] if all_regions else None
+        selected_regions = st.multiselect("대상 지역을 선택하세요:", options=all_regions, default=default_val)
         
     if selected_major == "예체능":
         st.warning("⚠️ 해당 계열에 대한 자료는 불충분합니다.")
@@ -175,12 +169,10 @@ if menu == "희망대학 컷":
         pattern = "|".join(keywords)
         df_filtered = df_cut[df_cut['지역'].isin(selected_regions) & df_cut['학과명'].str.contains(pattern, na=False)].copy()
         
-        # 💡 핵심 요구사항 3 & 4: 전형 선택 필터링 로직 및 2글자 판독, 종합전형 예외처리
         if selected_adm != "모든전형":
             mask = df_filtered['전형명'].apply(lambda x: check_overlap(selected_adm, x))
             df_temp = df_filtered[mask].copy()
             
-            # 조건에 부합하는 전형이 하나도 없을 경우 종합전형 기준으로 데이터 복구 표시
             if df_temp.empty:
                 st.warning(f"⚠️ 선택하신 '{selected_adm}'에 해당하는 데이터가 없어 '종합전형' 기준으로 대체하여 보여드립니다.")
                 mask_fallback = df_filtered['전형명'].apply(lambda x: check_overlap("종합전형", x))
@@ -223,13 +215,10 @@ if menu == "희망대학 컷":
                 if 'diff' in ambitious_match.columns: ambitious_match = ambitious_match.drop(columns=['diff'])
             if challenge_match.empty: challenge_match = valid_df[valid_df[target_col] < user_gpa].head(1).copy()
                 
-            # 💡 핵심 요구사항 1 & 3: 정렬(대학/학과/전형별) 및 2025 -> 2026 순차 노출 포맷
             def format_match_df(df_match):
                 if df_match.empty: return df_match
-                # 대학, 학과, 전형명 순으로 묶어서 정렬
                 df_sorted = df_match.sort_values(by=['대학명', '학과명', '전형명']).copy()
                 
-                # 2025년 데이터 먼저 배치, 2026년 데이터 뒤에 배치
                 if is_5g:
                     raw_cols = [
                         '지역', '대학명', '학과명', '전형명', 
@@ -250,7 +239,6 @@ if menu == "희망대학 컷":
 
                 valid_cols = [c for c in raw_cols if c in df_sorted.columns]
                 df_out = df_sorted[valid_cols].copy()
-                # 2026 데이터가 존재하지 않을 시 - 로 예외 처리하여 2025만 명확하게 노출
                 df_out = df_out.fillna('-') 
                 return df_out.rename(columns=rename_dict).reset_index(drop=True)
 
@@ -277,7 +265,8 @@ elif menu == "진로 교과 추천":
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        region_options = sorted([r for r in df_curr['지역'].unique() if r != ""])
+        # 💡 [필터링 업데이트] 'ㅊ'과 같은 1글자 오타 원천 차단 적용
+        region_options = sorted([str(r).strip() for r in df_curr['지역'].dropna().unique() if str(r).strip() != "" and len(str(r).strip()) > 1])
         selected_reg = st.selectbox("1. 지역 선택", options=region_options)
     df_filtered_reg = df_curr[df_curr['지역'] == selected_reg]
     with col2:
@@ -310,9 +299,6 @@ elif menu == "진로 교과 추천":
         })
         st.table(output_df)
 
-# ========================================================
-# 🌟 [보완] 모바일 전화 연동 및 반응형 센터 정렬 푸터 (노트북 가독성 강화)
-# ========================================================
 st.markdown("<br><br><hr>", unsafe_allow_html=True)
 
 st.markdown(
@@ -325,7 +311,7 @@ st.markdown(
             transition: color 0.2s;
         }
         .footer-link:hover {
-            color: #1f77b4; /* 노트북에서 마우스를 올리면 파란색으로 변하며 링크임을 알림 */
+            color: #1f77b4;
             text-decoration: underline;
         }
     </style>
