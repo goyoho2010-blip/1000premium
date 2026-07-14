@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import os
 
-# 1. 페이지 설정 및 브라우저 자동 번역 오작동 차단
-st.set_page_config(page_title="대입 전형 및 권역별 권장과목 분석 시스템", layout="wide")
+# 1. 페이지 설정 및 브라우저 자동 번역 오작동 차단 (웹 페이지 탭 및 카카오톡 공유 제목 일관성 통일)
+st.set_page_config(page_title="천명의선택 Choice1000 대입 분석 시스템", layout="wide")
 st.markdown(
     """
     <html lang="ko" class="notranslate" google="notranslate">
@@ -39,7 +39,7 @@ MAJOR_MAPPING = {
     "예체능": []
 }
 
-@st.cache_data(ttl=3600) # 1시간마다 캐시 갱신 (데이터 수정 시 자동 반영률 향상)
+@st.cache_data(ttl=3600)
 def load_admission_data():
     file_path = os.path.join(BASE_DIR, CUT_FILE_NAME)
     if not os.path.exists(file_path): return pd.DataFrame()
@@ -53,7 +53,6 @@ def load_admission_data():
     df['cut_70'] = pd.to_numeric(df.get('2025등급컷', np.nan), errors='coerce')
     df['cut_50'] = pd.to_numeric(df.get('2025등급컷2', np.nan), errors='coerce')
     
-    # 9등급 -> 5등급 누적 백분위 기반 정밀 환산 알고리즘
     def convert_9_to_5(grade9):
         if pd.isna(grade9): return np.nan
         g9_p = [1.0, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.0]
@@ -104,7 +103,8 @@ def load_curriculum_data():
 df_cut = load_admission_data()
 df_curr = load_curriculum_data()
 
-st.title("🎯 대입 분석 및 진로교과 매핑 시스템")
+# 💡 상단 브랜드 타이틀 및 서브타이틀 직관적 통일
+st.title("🎯 천명의선택 Choice1000 대입 분석 시스템")
 st.caption("천명의선택 프리미엄 입시 컨설팅 고도화 연동 솔루션")
 st.markdown("---")
 
@@ -155,7 +155,6 @@ if menu == "희망대학 컷":
         selected_major = st.selectbox("분석 대상 계열을 선택하세요:", list(MAJOR_MAPPING.keys()))
         
     with col2:
-        # 💡 [필터링 업데이트] 'ㅊ'과 같은 1글자 오타 및 공백 데이터 원천 차단
         all_regions = sorted([str(r).strip() for r in df_cut['지역'].dropna().unique() if str(r).strip() != "" and len(str(r).strip()) > 1])
         default_val = all_regions[:1] if all_regions else None
         selected_regions = st.multiselect("대상 지역을 선택하세요:", options=all_regions, default=default_val)
@@ -265,7 +264,6 @@ elif menu == "진로 교과 추천":
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        # 💡 [필터링 업데이트] 'ㅊ'과 같은 1글자 오타 원천 차단 적용
         region_options = sorted([str(r).strip() for r in df_curr['지역'].dropna().unique() if str(r).strip() != "" and len(str(r).strip()) > 1])
         selected_reg = st.selectbox("1. 지역 선택", options=region_options)
     df_filtered_reg = df_curr[df_curr['지역'] == selected_reg]
