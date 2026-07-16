@@ -4,10 +4,10 @@ import pandas as pd
 import numpy as np
 import os
 
-# 1. 페이지 설정 및 브라우저 자동 번역 오작동 차단
+# 1. 페이지 설정 및 브라우저 자동 번역 오작동 차단 (카카오톡 공유 제목 일관성 유지)
 st.set_page_config(page_title="천명의선택 입시 NAVI", layout="wide")
 
-# 2. 💡 [핵심 추가] 카카오톡 미리보기 고정을 위한 Open Graph 메타 태그 강제 주입
+# 2. 카카오톡 미리보기 고정을 위한 Open Graph 메타 태그 강제 주입
 meta_tags = """
 <head>
     <meta property="og:title" content="천명의선택 입시 NAVI" />
@@ -27,7 +27,6 @@ EXCEL_FILE_NAME = "2028학년도 권역별 대학별 권장과목(반영과목).
 st.markdown("""
     <style>
     header {visibility: hidden;}
-    /* PC 및 모바일 화면에서 제목이 절대 줄바꿈되지 않고 한 줄로 나오도록 글자 크기 최적화 */
     .brand-title {
         font-size: calc(1.6rem + 1.2vw) !important;
         font-weight: 800 !important;
@@ -52,6 +51,26 @@ MAJOR_MAPPING = {
     "예체능": []
 }
 
+# 💡 9등급 -> 5등급 누적 백분위 기반 정밀 환산 알고리즘
+def convert_9_to_5(grade9):
+    if pd.isna(grade9) or str(grade9).strip() in ["", "-", "nan", "NaN", "None", "- ."]:
+        return np.nan
+    try:
+        val = float(grade9)
+        # 등급 범위 외 노이즈 차단
+        if val < 1.0 or val > 9.0:
+            return np.nan
+        g9_p = [1.0, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.0]
+        pct_p = [0, 4, 11, 23, 40, 60, 77, 89, 96, 100]
+        g5_p = [1.0, 1.5, 2.5, 3.5, 4.5, 5.0]
+        pct5_p = [0, 10, 34, 66, 90, 100]
+        
+        pct = np.interp(val, g9_p, pct_p)
+        g5 = np.interp(pct, pct5_p, g5_p)
+        return round(g5, 2)
+    except:
+        return np.nan
+
 @st.cache_data(ttl=3600)
 def load_admission_data():
     file_path = os.path.join(BASE_DIR, CUT_FILE_NAME)
@@ -63,26 +82,31 @@ def load_admission_data():
     for col in df.columns:
         if df[col].dtype == 'object': df[col] = df[col].str.strip()
         
+    # 2025학년도 등급컷 정제 및 숫자 매핑
     df['cut_70'] = pd.to_numeric(df.get('2025등급컷', np.nan), errors='coerce')
     df['cut_50'] = pd.to_numeric(df.get('2025등급컷2', np.nan), errors='coerce')
     
-    def convert_9_to_5(grade9):
-        if pd.isna(grade9): return np.nan
-        g9_p = [1.0, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.0]
-        pct_p = [0, 4, 11, 23, 40, 60, 77, 89, 96, 100]
-        g5_p = [1.0, 1.5, 2.5, 3.5, 4.5, 5.0]
-        pct5_p = [0, 10, 34, 66, 90, 100]
-        
-        pct = np.interp(grade9, g9_p, pct_p)
-        g5 = np.interp(pct, pct5_p, g5_p)
-        return round(g5, 2)
-        
     df['cut_70_5g'] = df['cut_70'].apply(convert_9_to_5)
     df['cut_50_5g'] = df['cut_50'].apply(convert_9_to_5)
     
-    if '2026등급컷I' in df.columns: df['cut_26_1_5g'] = pd.to_numeric(df['2026등급컷I'], errors='coerce').apply(convert_9_to_5)
-    if '2026등급컷II' in df.columns: df['cut_26_2_5g'] = pd.to_numeric(df['2026등급컷II'], errors='coerce').apply(convert_9_to_5)
-    if '2026등급컷III' in df.columns: df['cut_26_3_5g'] = pd.to_numeric(df['2026등급컷III'], errors='coerce').apply(convert_9_to_5)
+    # 2026학년도 등급컷I, II, III 정밀 정제 및 환산
+    if '2026등급컷I' in df.columns:
+        df['cut_26_1_numeric'] = pd.to_numeric(df['2026등급컷I'], errors='coerce')
+        df['cut_26_1_5g'] = df['cut_26_1_numeric'].apply(convert_9_to_5)
+    else:
+        df['cut_26_1_5g'] = np.nan
+
+    if '2026등급컷II' in df.columns:
+        df['cut_26_2_numeric'] = pd.to_numeric(df['2026등급컷II'], errors='coerce')
+        df['cut_26_2_5g'] = df['cut_26_2_numeric'].apply(convert_9_to_5)
+    else:
+        df['cut_26_2_5g'] = np.nan
+
+    if '2026등급컷III' in df.columns:
+        df['cut_26_3_numeric'] = pd.to_numeric(df['2026등급컷III'], errors='coerce')
+        df['cut_26_3_5g'] = df['cut_26_3_numeric'].apply(convert_9_to_5)
+    else:
+        df['cut_26_3_5g'] = np.nan
         
     return df
 
@@ -116,7 +140,6 @@ def load_curriculum_data():
 df_cut = load_admission_data()
 df_curr = load_curriculum_data()
 
-# 💡 PC와 휴대폰에서 한 줄 정렬을 유지하는 고유 HTML 태그 결합 출력
 st.markdown('<div class="brand-title">🎯 천명의선택 입시 NAVI</div>', unsafe_allow_html=True)
 st.caption("천명의선택 프리미엄 입시 컨설팅 고도화 연동 솔루션")
 st.markdown("---")
@@ -192,15 +215,27 @@ if menu == "희망대학 컷":
             else:
                 df_filtered = df_temp
         
+        # 기본 70%컷 컬럼 정의
         target_col = 'cut_70_5g' if is_5g else 'cut_70'
-        valid_df = df_filtered.dropna(subset=[target_col]).sort_values(by=target_col).copy()
+        
+        # 💡 [핵심 보완] 등급컷이 비어있지 않고 이상치(0 등)가 아닌 진짜 유효 데이터만 명확하게 추출
+        valid_df = df_filtered.dropna(subset=[target_col]).copy()
+        
+        # 9등급 혹은 5등급 체제에 맞게 이상한 등급 범위를 가진 쓰레기 데이터 일괄 정제
+        if is_5g:
+            valid_df = valid_df[(valid_df[target_col] >= 1.0) & (valid_df[target_col] <= 5.0)]
+        else:
+            valid_df = valid_df[(valid_df[target_col] >= 1.0) & (valid_df[target_col] <= 9.0)]
+            
+        # 입결 오름차순 정렬 (숫자가 낮을수록 최상위 등급)
+        valid_df = valid_df.sort_values(by=target_col)
         
         if valid_df.empty:
             st.error("💡 현재, 지원 가능 대학의 자료가 부족합니다.")
         else:
             st.markdown(f"#### 📊 {selected_major} 계열 통합 리포트")
-            highest_row = valid_df.iloc[0]
-            lowest_row = valid_df.iloc[-1]
+            highest_row = valid_df.iloc[0] # 최상위 입결 (숫자가 가장 작은 등급)
+            lowest_row = valid_df.iloc[-1]  # 최하위 입결 (숫자가 가장 큰 등급)
             
             unit = "등급 (5G)" if is_5g else "등급 (9G)"
             
