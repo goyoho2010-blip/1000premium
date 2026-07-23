@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import os
 
-# 1. 페이지 설정 및 브라우저 자동 번역 오작동 차단 (카카오톡 공유 제목 일관성 유지)
+# 1. 페이지 설정 및 브라우저 자동 번역 오작동 차단
 st.set_page_config(page_title="천명의선택 입시 NAVI", layout="wide")
 
 # 2. 카카오톡 미리보기 고정을 위한 Open Graph 메타 태그 강제 주입
@@ -51,13 +51,28 @@ MAJOR_MAPPING = {
     "예체능": []
 }
 
+# 💡 전형 필터링을 위한 키워드 정밀 사전 구축
+ADMISSION_KEYWORDS = {
+    "교과전형": ["교과", "학생부교과"],
+    "종합전형": ["종합", "학생부종합", "미래인재", "네오르네상스", "가천바람개비", "서류", "면접"],
+    "논술전형": ["논술"],
+    "기회전형": ["기회", "고른기회", "사회배려"],
+    "농어촌전형": ["농어촌"],
+    "지역균형전형": ["지역균형", "지균", "학교장추천", "학추"],
+    "특성화고교전형": ["특성화고"],
+    "실기우수자": ["실기", "실기우수"],
+    "계약학과전형": ["계약학과", "채용조건"],
+    "기초생활전형": ["기초생활", "차상위", "한부모"],
+    "운동선수전형": ["체육특기", "체특", "운동선수"],
+    "지도자추천전형": ["지도자", "추천"]
+}
+
 # 💡 9등급 -> 5등급 누적 백분위 기반 정밀 환산 알고리즘
 def convert_9_to_5(grade9):
     if pd.isna(grade9) or str(grade9).strip() in ["", "-", "nan", "NaN", "None", "- ."]:
         return np.nan
     try:
         val = float(grade9)
-        # 등급 범위 외 노이즈 차단
         if val < 1.0 or val > 9.0:
             return np.nan
         g9_p = [1.0, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.0]
@@ -82,14 +97,12 @@ def load_admission_data():
     for col in df.columns:
         if df[col].dtype == 'object': df[col] = df[col].str.strip()
         
-    # 2025학년도 등급컷 정제 및 숫자 매핑
     df['cut_70'] = pd.to_numeric(df.get('2025등급컷', np.nan), errors='coerce')
     df['cut_50'] = pd.to_numeric(df.get('2025등급컷2', np.nan), errors='coerce')
     
     df['cut_70_5g'] = df['cut_70'].apply(convert_9_to_5)
     df['cut_50_5g'] = df['cut_50'].apply(convert_9_to_5)
     
-    # 2026학년도 등급컷I, II, III 정밀 정제 및 환산
     if '2026등급컷I' in df.columns:
         df['cut_26_1_numeric'] = pd.to_numeric(df['2026등급컷I'], errors='coerce')
         df['cut_26_1_5g'] = df['cut_26_1_numeric'].apply(convert_9_to_5)
@@ -152,11 +165,16 @@ st.markdown("### 📋 다음 중 선택하세요")
 menu = st.radio("원하시는 메뉴를 선택하세요.", ("희망대학 컷", "진로 교과 추천"), horizontal=True, label_visibility="collapsed")
 st.markdown("---")
 
-def check_overlap(target, text):
-    if pd.isna(text): return False
-    text = str(text)
-    for i in range(len(target) - 1):
-        if target[i:i+2] in text: return True
+# 💡 선택 전형 매칭 검증 함수 (정밀 키워드 비교)
+def is_target_admission(selected_adm, row_adm_text):
+    if pd.isna(row_adm_text): return False
+    text = str(row_adm_text).strip()
+    if selected_adm == "모든전형": return True
+    
+    keywords = ADMISSION_KEYWORDS.get(selected_adm, [selected_adm])
+    for kw in keywords:
+        if kw in text:
+            return True
     return False
 
 if menu == "희망대학 컷":
@@ -202,40 +220,32 @@ if menu == "희망대학 컷":
     else:
         keywords = MAJOR_MAPPING[selected_major]
         pattern = "|".join(keywords)
+        
+        # 1차 계열 및 지역 필터링
         df_filtered = df_cut[df_cut['지역'].isin(selected_regions) & df_cut['학과명'].str.contains(pattern, na=False)].copy()
         
+        # 2차 선택 전형 정밀 필터링 (선택 전형만 완벽하게 걸러냄)
         if selected_adm != "모든전형":
-            mask = df_filtered['전형명'].apply(lambda x: check_overlap(selected_adm, x))
-            df_temp = df_filtered[mask].copy()
+            mask = df_filtered['전형명'].apply(lambda x: is_target_admission(selected_adm, x))
+            df_filtered = df_filtered[mask].copy()
             
-            if df_temp.empty:
-                st.warning(f"⚠️ 선택하신 '{selected_adm}'에 해당하는 데이터가 없어 '종합전형' 기준으로 대체하여 보여드립니다.")
-                mask_fallback = df_filtered['전형명'].apply(lambda x: check_overlap("종합전형", x))
-                df_filtered = df_filtered[mask_fallback].copy()
-            else:
-                df_filtered = df_temp
-        
-        # 기본 70%컷 컬럼 정의
         target_col = 'cut_70_5g' if is_5g else 'cut_70'
         
-        # 💡 [핵심 보완] 등급컷이 비어있지 않고 이상치(0 등)가 아닌 진짜 유효 데이터만 명확하게 추출
+        # 유효 데이터 정제 (이상치 및 공백 제거)
         valid_df = df_filtered.dropna(subset=[target_col]).copy()
-        
-        # 9등급 혹은 5등급 체제에 맞게 이상한 등급 범위를 가진 쓰레기 데이터 일괄 정제
         if is_5g:
             valid_df = valid_df[(valid_df[target_col] >= 1.0) & (valid_df[target_col] <= 5.0)]
         else:
             valid_df = valid_df[(valid_df[target_col] >= 1.0) & (valid_df[target_col] <= 9.0)]
             
-        # 입결 오름차순 정렬 (숫자가 낮을수록 최상위 등급)
         valid_df = valid_df.sort_values(by=target_col)
         
         if valid_df.empty:
-            st.error("💡 현재, 지원 가능 대학의 자료가 부족합니다.")
+            st.warning(f"💡 선택하신 지역/계열에 [{selected_adm}] 조건에 해당하는 지원 가능 대학 자료가 없습니다.")
         else:
-            st.markdown(f"#### 📊 {selected_major} 계열 통합 리포트")
-            highest_row = valid_df.iloc[0] # 최상위 입결 (숫자가 가장 작은 등급)
-            lowest_row = valid_df.iloc[-1]  # 최하위 입결 (숫자가 가장 큰 등급)
+            st.markdown(f"#### 📊 {selected_major} 계열 [{selected_adm}] 통합 리포트")
+            highest_row = valid_df.iloc[0]
+            lowest_row = valid_df.iloc[-1]
             
             unit = "등급 (5G)" if is_5g else "등급 (9G)"
             
